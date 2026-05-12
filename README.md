@@ -1,20 +1,21 @@
 # SHL Conversational Assessment Recommender
 
-A stateless conversational RAG API that recommends relevant SHL assessments using semantic retrieval and grounded LLM responses.
+A production-ready, single-service FastAPI application with a React recruiter copilot frontend for recommending SHL assessments from the local catalog only.
 
 The system supports:
 
-- assessment recommendation
+- SHL assessment recommendations
 - clarification questions
 - recommendation refinement
-- assessment comparison
-- prompt-injection refusal
+- catalog-grounded assessment comparison
+- prompt-injection and off-topic refusal
+- React + TypeScript frontend served by FastAPI
 
-All recommendations are grounded strictly in the local SHL catalog dataset.
+All recommendations are grounded strictly in `data/catalog.json`.
 
 ---
 
-# Features
+## Features
 
 - FastAPI backend with strict Pydantic schemas
 - Hybrid retrieval using FAISS + RapidFuzz
@@ -27,7 +28,43 @@ All recommendations are grounded strictly in the local SHL catalog dataset.
 
 ---
 
-# Project Structure
+## Architecture Overview
+
+The application follows a Retrieval-Augmented Generation (RAG) architecture.
+
+### Retrieval Pipeline
+
+1. Catalog preprocessing generates searchable text fields.
+2. Sentence-transformer embeddings are generated for catalog entries.
+3. FAISS performs semantic similarity search.
+4. RapidFuzz performs keyword-based scoring.
+5. Hybrid ranking combines semantic and lexical relevance.
+
+### Conversation Flow
+
+The API remains fully stateless.
+
+Each `/chat` request includes the required conversation history for the current turn.
+
+Supported conversational behaviors:
+
+- clarification
+- recommendation
+- refinement
+- comparison
+- refusal handling
+
+Frontend serving:
+
+- React + TypeScript + Vite builds into `frontend/dist`.
+- FastAPI serves `/` as the React app.
+- FastAPI serves `/assets/*` as compiled Vite assets.
+- Unknown non-API GET routes return `index.html` for SPA routing.
+- `/chat`, `/health`, `/docs`, and `/openapi.json` continue to work normally.
+
+---
+
+## Project Structure
 
 ```text
 app/
@@ -44,6 +81,15 @@ data/
 ├── faiss.index
 └── index_metadata.json
 
+frontend/
+└── src/
+    ├── components/
+    ├── pages/
+    ├── services/
+    ├── types/
+    ├── App.tsx
+    └── main.tsx
+
 scripts/
 ├── preprocess.py
 └── build_index.py
@@ -54,58 +100,16 @@ tests/
 
 ---
 
-# Architecture Overview
-
-The application follows a Retrieval-Augmented Generation (RAG) architecture.
-
-## Retrieval Pipeline
-
-1. Catalog preprocessing generates searchable text fields.
-2. Sentence-transformer embeddings are generated for catalog entries.
-3. FAISS performs semantic similarity search.
-4. RapidFuzz performs keyword-based scoring.
-5. Hybrid ranking combines semantic and lexical relevance.
-
-## Conversation Flow
-
-The API remains fully stateless.
-
-Each `/chat` request includes the required conversation history for the current turn.
-
-Supported conversational behaviors:
-
-- clarification
-- recommendation
-- refinement
-- comparison
-- refusal handling
-
----
-
-# Setup
-
-## 1. Create Virtual Environment
+## Backend Setup
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-```
-
-## 2. Install Dependencies
-
-```powershell
 pip install -r requirements.txt
-```
-
-## 3. Configure Environment Variables
-
-Copy the example environment file:
-
-```powershell
 copy .env.example .env
 ```
 
-Add your Gemini API key:
+Set your Gemini key in `.env`:
 
 ```env
 GEMINI_API_KEY=your_api_key
@@ -113,52 +117,79 @@ GEMINI_API_KEY=your_api_key
 
 ---
 
-# Build Retrieval Index
+## Frontend Setup
+
+```powershell
+cd frontend
+npm install
+cd ..
+```
+
+---
+
+## Build
+
+Build the React frontend:
+
+```powershell
+cd frontend
+npm run build
+cd ..
+```
+
+Build retrieval artifacts:
 
 ```powershell
 python scripts/preprocess.py
 python scripts/build_index.py
 ```
 
-This generates:
-
-- processed catalog data
-- FAISS vector index
-- retrieval metadata
-
 ---
 
-# Run Locally
+## Run Locally
+
+Production-like single service:
 
 ```powershell
 uvicorn app.main:app --reload --port 8080
 ```
 
-API:
+Open:
 
 ```text
-http://127.0.0.1:8080
+http://127.0.0.1:8080/
 ```
 
-Swagger Docs:
+API/docs:
 
 ```text
+http://127.0.0.1:8080/chat
+http://127.0.0.1:8080/health
 http://127.0.0.1:8080/docs
 ```
 
-Health Check:
+Frontend development server:
+
+```powershell
+cd frontend
+npm run dev
+```
+
+Open:
 
 ```text
-http://127.0.0.1:8080/health
+http://127.0.0.1:5173
 ```
+
+The Vite dev server proxies `/chat` and `/health` to `http://127.0.0.1:8080`, so development does not require CORS.
 
 ---
 
-# API
+## API
 
-## POST `/chat`
+### POST `/chat`
 
-### Request
+Request:
 
 ```json
 {
@@ -171,7 +202,7 @@ http://127.0.0.1:8080/health
 }
 ```
 
-### Response
+Response:
 
 ```json
 {
@@ -189,24 +220,22 @@ http://127.0.0.1:8080/health
 
 ---
 
-# Environment Variables
+## Environment Variables
 
-| Variable               | Description             |
-| ---------------------- | ----------------------- |
-| GEMINI_API_KEY         | Gemini API key          |
-| GEMINI_MODEL           | Gemini model name       |
-| CATALOG_PATH           | Raw catalog path        |
-| PROCESSED_CATALOG_PATH | Processed catalog path  |
-| FAISS_INDEX_PATH       | FAISS index path        |
-| INDEX_METADATA_PATH    | Retrieval metadata path |
-| EMBEDDING_MODEL        | Embedding model         |
-| LOG_LEVEL              | Logging level           |
+| Variable                 | Description             |
+| ------------------------ | ----------------------- |
+| `GEMINI_API_KEY`         | Gemini API key          |
+| `GEMINI_MODEL`           | Gemini model name       |
+| `CATALOG_PATH`           | Raw catalog path        |
+| `PROCESSED_CATALOG_PATH` | Processed catalog path  |
+| `FAISS_INDEX_PATH`       | FAISS index path        |
+| `INDEX_METADATA_PATH`    | Retrieval metadata path |
+| `EMBEDDING_MODEL`        | Embedding model         |
+| `LOG_LEVEL`              | Logging level           |
 
 ---
 
-# Testing
-
-Run tests:
+## Testing
 
 ```powershell
 pytest
@@ -214,6 +243,7 @@ pytest
 
 Tests cover:
 
+- health checks
 - schema validation
 - grounded recommendations
 - clarification flow
@@ -221,29 +251,36 @@ Tests cover:
 - comparison behavior
 - refusal handling
 
----
+## Render Deployment
 
-# Deployment
+This project deploys as one Render web service. FastAPI serves both the React frontend and API from the same host/domain.
 
-The repository includes `render.yaml` for deployment on Render.
-
-## Build Command
+Build command:
 
 ```bash
-pip install -r requirements.txt && python scripts/preprocess.py && python scripts/build_index.py
+pip install -r requirements.txt && cd frontend && npm install && npm run build && cd .. && python scripts/preprocess.py && python scripts/build_index.py
 ```
 
-## Start Command
+Start command:
 
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 10000
 ```
 
-Set `GEMINI_API_KEY` in the Render dashboard environment variables.
+Set `GEMINI_API_KEY` in the Render dashboard. The deployed app exposes:
+
+```text
+https://my-app.onrender.com/
+https://my-app.onrender.com/chat
+https://my-app.onrender.com/health
+https://my-app.onrender.com/docs
+```
 
 ---
 
-# Evaluation Strategy
+## Evaluation Strategy
+
+Evaluate with vague recruiter queries, technical hiring prompts, refinement turns, comparison requests, and prompt-injection attempts. Check that recommendations always use catalog URLs, clarification/refusal turns return an empty recommendation list, and recommendation turns return 1-10 relevant SHL assessments.
 
 The system was evaluated using:
 

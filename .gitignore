@@ -5,3 +5,5 @@ __pycache__/
 pytest-cache-files-*/
 .env
 .vscode/
+frontend/node_modules
+frontend/dist
